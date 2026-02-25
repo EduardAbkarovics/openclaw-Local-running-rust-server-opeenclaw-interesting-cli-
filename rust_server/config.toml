@@ -1,0 +1,10 @@
+# ClawDBot Rust szerver konfiguráció
+# Felülírható CLAWDBOT_* környezeti változókkal vagy .env fájlból
+
+host = "0.0.0.0"
+port = 3000
+llm_url = "http://127.0.0.1:8000"
+bot_name = "ClawDBot"
+default_max_tokens = 512
+cors_origins = "*"
+rate_limit_per_second = 5

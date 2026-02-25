@@ -1,0 +1,30 @@
+# Python
+python_llm/.venv/
+python_llm/__pycache__/
+python_llm/*.pyc
+python_llm/*.pyo
+
+# Rust
+rust_server/target/
+
+# Modellek / cache (nagy fájlok, ne kerüljenek fel)
+models/
+hf_cache/
+
+# Logok
+*.log
+hf_cache_copy.log
+
+# Környezeti fájlok (titkos adatok)
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Claude Code
+.claude/
+
+# Temp files
+*.tmp.*

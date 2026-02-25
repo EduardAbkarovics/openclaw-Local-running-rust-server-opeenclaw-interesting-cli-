@@ -1,0 +1,3 @@
+[build]
+# Target mappa: C: meghajtón – elkerüli a W: mapped drive permission hibát
+target-dir = "C:/cargo-build/openclaw_server"
