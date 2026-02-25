@@ -344,14 +344,46 @@ async fn handle_ws(socket: WebSocket, state: AppState) {
                             .await;
                     }
                     Err(e) => {
-                        error!("WS LLM hiba: {e}");
-                        let err_msg = json!({
-                            "type": "error",
-                            "message": e.to_string(),
-                        });
-                        let _ = sender
-                            .send(WsMessage::Text(err_msg.to_string()))
-                            .await;
+                        // Fallback: nem-streaming mód ha a streaming nem sikerült
+                        warn!("Streaming hiba, fallback nem-streaming módra: {e}");
+                        let fallback_req = {
+                            let sessions = state.sessions.read().await;
+                            let session = sessions.get(&session_id).unwrap();
+                            state
+                                .bot
+                                .build_llm_request(&user_text, session, max_tokens)
+                        };
+
+                        match state.llm.generate(fallback_req).await {
+                            Ok(llm_resp) => {
+                                let reply = state.bot.postprocess_response(&llm_resp.text);
+                                {
+                                    let mut sessions = state.sessions.write().await;
+                                    if let Some(s) = sessions.get_mut(&session_id) {
+                                        s.add_message(BotMessage::user(&user_text));
+                                        s.add_message(BotMessage::assistant(&reply));
+                                    }
+                                }
+                                let response = json!({
+                                    "type": "reply",
+                                    "session_id": session_id,
+                                    "data": reply,
+                                });
+                                let _ = sender
+                                    .send(WsMessage::Text(response.to_string()))
+                                    .await;
+                            }
+                            Err(fallback_err) => {
+                                error!("WS LLM hiba (streaming + fallback): {fallback_err}");
+                                let err_msg = json!({
+                                    "type": "error",
+                                    "message": fallback_err.to_string(),
+                                });
+                                let _ = sender
+                                    .send(WsMessage::Text(err_msg.to_string()))
+                                    .await;
+                            }
+                        }
                     }
                 }
             }

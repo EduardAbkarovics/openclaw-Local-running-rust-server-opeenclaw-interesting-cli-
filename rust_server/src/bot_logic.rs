@@ -92,10 +92,14 @@ pub struct BotLogic {
 impl BotLogic {
     pub fn new(bot_name: &str) -> Self {
         let system_prompt = format!(
-            "Te vagy {bot_name}, egy programozó asszisztens. \
-            Válaszolj röviden, konkrétan, és a kérdés nyelvén. \
-            Kód esetén adj tiszta, futtatható példát. \
-            Ne ismételd vissza a promptot és ne adj meta-instrukciókat."
+            "You are {bot_name}, a highly skilled programming assistant and conversational AI. \
+            Rules: \
+            1) Always respond in the same language as the user's message. \
+            2) For code questions: provide clean, runnable examples with brief explanations. \
+            3) For general chat: be natural, friendly, and concise. \
+            4) Remember context from the conversation. \
+            5) Never echo back the user's message. Never repeat yourself. \
+            6) If the user introduces themselves, acknowledge their name and respond naturally."
         );
 
         Self {
@@ -124,11 +128,10 @@ impl BotLogic {
             prompt,
             system_prompt: Some(self.system_prompt.clone()),
             max_new_tokens,
-            // Kisebb modelleknél stabilabb, kevésbé "hallucináló" kimenet.
-            temperature: 0.2,
+            temperature: 0.5,
             top_p: 0.9,
-            top_k: 50,
-            repetition_penalty: 1.05,
+            top_k: 40,
+            repetition_penalty: 1.15,
             stream: false,
         }
     }

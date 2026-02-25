@@ -15,7 +15,7 @@ from datetime import datetime
 RUST_WS_URL = os.environ.get("CLAWDBOT_WS_URL", "ws://127.0.0.1:3000/ws/chat")
 BOT_NAME    = os.environ.get("CLAWDBOT_BOT_NAME", "ClawDBot")
 CHAT_TIMEOUT_SECONDS = float(os.environ.get("CHAT_TIMEOUT_SECONDS", "300"))
-CHAT_MAX_TOKENS = int(os.environ.get("CHAT_MAX_TOKENS", "128"))
+CHAT_MAX_TOKENS = int(os.environ.get("CHAT_MAX_TOKENS", "512"))
 
 _miss = []
 try:    import websockets

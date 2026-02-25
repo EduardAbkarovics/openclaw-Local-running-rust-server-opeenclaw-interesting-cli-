@@ -138,6 +138,20 @@ impl LlmClient {
             .await
             .map_err(|e| AppError::LlmUnavailable(e.to_string()))?;
 
+        // HTTP státusz ellenőrzés a content-type előtt
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            if status.as_u16() == 503 {
+                return Err(AppError::LlmUnavailable(format!(
+                    "A modell még töltődik, próbáld újra: {body}"
+                )));
+            }
+            return Err(AppError::LlmGeneration(format!(
+                "HTTP {status}: {body}"
+            )));
+        }
+
         // SSE parsing – minden sor "data: <token>" formátumú
         use reqwest::header::CONTENT_TYPE;
         let ct = response

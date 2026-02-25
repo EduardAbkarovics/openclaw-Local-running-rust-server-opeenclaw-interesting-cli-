@@ -60,7 +60,7 @@ log = logging.getLogger("clawdbot.llm")
 # ---------------------------------------------------------------------------
 # Konfiguráció – felülírható környezeti változókkal
 # ---------------------------------------------------------------------------
-MODEL_NAME = os.environ.get("MODEL_NAME", "WizardLM/WizardCoder-Python-13B-V1.0")
+MODEL_NAME = os.environ.get("MODEL_NAME", "Qwen/Qwen2.5-Coder-7B-Instruct")
 MAX_NEW_TOKENS = int(os.environ.get("MAX_NEW_TOKENS", "512"))
 HOST = os.environ.get("LLM_HOST", "0.0.0.0")
 PORT = int(os.environ.get("LLM_PORT", "8000"))
