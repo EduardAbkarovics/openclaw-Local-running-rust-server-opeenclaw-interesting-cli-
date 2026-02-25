@@ -68,7 +68,7 @@ pub struct LlmClient {
 impl LlmClient {
     pub fn new(base_url: &str) -> Self {
         let client = Client::builder()
-            .timeout(Duration::from_secs(300)) // LLM generálás lassú lehet
+            // Nincs timeout – akármeddig futhat (pl. éjszakára)
             .connect_timeout(Duration::from_secs(10))
             .build()
             .expect("Reqwest kliens létrehozása sikertelen");

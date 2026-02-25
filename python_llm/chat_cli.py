@@ -14,7 +14,8 @@ from datetime import datetime
 
 RUST_WS_URL = os.environ.get("CLAWDBOT_WS_URL", "ws://127.0.0.1:3000/ws/chat")
 BOT_NAME    = os.environ.get("CLAWDBOT_BOT_NAME", "ClawDBot")
-CHAT_TIMEOUT_SECONDS = float(os.environ.get("CHAT_TIMEOUT_SECONDS", "300"))
+# 0 = nincs timeout (akármeddig futhat)
+CHAT_TIMEOUT_SECONDS = float(os.environ.get("CHAT_TIMEOUT_SECONDS", "0"))
 CHAT_MAX_TOKENS = int(os.environ.get("CHAT_MAX_TOKENS", "512"))
 
 _miss = []
@@ -176,7 +177,9 @@ def user_bubble(text: str):
 
 # ── Bot thinking spinner (narancs forgó) ─────────────────────────────────────
 async def thinking_bubble(ws, timeout: float = CHAT_TIMEOUT_SECONDS):
-    deadline = asyncio.get_event_loop().time() + timeout
+    # timeout=0 -> nincs időkorlát, akármeddig futhat
+    has_deadline = timeout > 0
+    deadline = asyncio.get_event_loop().time() + timeout if has_deadline else None
     orbit = ["◐","◓","◑","◒"]
     fire  = ["🔥","✨","⚡","💡","🔥","✨","⚡","💡"]
     i = 0
@@ -195,12 +198,16 @@ async def thinking_bubble(ws, timeout: float = CHAT_TIMEOUT_SECONDS):
                 padding=(0, 1),
             ))
 
-            remaining = deadline - asyncio.get_event_loop().time()
-            if remaining <= 0:
-                raise asyncio.TimeoutError()
+            if has_deadline:
+                remaining = deadline - asyncio.get_event_loop().time()
+                if remaining <= 0:
+                    raise asyncio.TimeoutError()
+                wait_time = min(0.25, remaining)
+            else:
+                wait_time = 0.25  # nincs timeout, fix intervallum
 
             try:
-                raw = await asyncio.wait_for(ws.recv(), timeout=min(0.25, remaining))
+                raw = await asyncio.wait_for(ws.recv(), timeout=wait_time)
                 msg = json.loads(raw)
                 msg_type = msg.get("type")
                 if msg_type in ("reply", "error"):
