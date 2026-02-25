@@ -1,0 +1,23 @@
+# ClawDBot – Python LLM szerver függőségek
+# Python >= 3.10 szükséges
+
+# --- Core LLM stack ---
+torch>=2.2.0                   # CUDA 12.x kompatibilis wheel ajánlott
+torchvision>=0.17.0
+torchaudio>=2.2.0
+transformers>=4.40.0
+accelerate>=0.29.0             # multi-GPU device_map="auto" támogatás
+safetensors>=0.4.3             # gyors modell betöltés
+
+# --- API szerver ---
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.7.0
+
+# --- CLI chat kliens ---
+websockets>=12.0
+
+# --- Segédkönyvtárak ---
+sentencepiece>=0.2.0           # néhány tokenizer igényli
+protobuf>=4.25.0
+huggingface_hub>=0.23.0
