@@ -26,22 +26,25 @@ if %PYMIN% GEQ 13 (
     echo Megprobalok Python 3.12-t hasznalni a venvhez...
     where py >nul 2>&1
     if %ERRORLEVEL% EQU 0 (
-        py -3.12 --version >nul 2>&1
-        if %ERRORLEVEL% EQU 0 (
+        py -3.12 -c "import sys; print(sys.version)" >nul 2>&1 && (
             echo [OK] Python 3.12 talalhato - ezt hasznalom.
             set PYTHON_CMD=py -3.12
             goto :create_venv
         )
-        py -3.11 --version >nul 2>&1
-        if %ERRORLEVEL% EQU 0 (
+        py -3.11 -c "import sys; print(sys.version)" >nul 2>&1 && (
             echo [OK] Python 3.11 talalhato - ezt hasznalom.
             set PYTHON_CMD=py -3.11
             goto :create_venv
         )
+        py -3.10 -c "import sys; print(sys.version)" >nul 2>&1 && (
+            echo [OK] Python 3.10 talalhato - ezt hasznalom.
+            set PYTHON_CMD=py -3.10
+            goto :create_venv
+        )
     )
     echo.
-    echo [HIBA] Python 3.11 vagy 3.12 nem talalhato!
-    echo Telepitsd: https://www.python.org/downloads/release/python-3120/
+    echo [HIBA] Python 3.10, 3.11 vagy 3.12 nem talalhato!
+    echo Telepitsd: https://www.python.org/downloads/release/python-3120/ vagy 3.10.x verziot
     echo            es valaszd: "Add to PATH" + "py launcher"
     pause
     exit /b 1

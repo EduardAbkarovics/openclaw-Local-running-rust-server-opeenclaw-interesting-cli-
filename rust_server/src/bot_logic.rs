@@ -1,4 +1,4 @@
-﻿/// ClawDBot logika – prompt összeállítás, kontextus kezelés, válasz feldolgozás.
+/// ClawDBot logika – prompt összeállítás, kontextus kezelés, válasz feldolgozás.
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -92,11 +92,10 @@ pub struct BotLogic {
 impl BotLogic {
     pub fn new(bot_name: &str) -> Self {
         let system_prompt = format!(
-            "Te vagy {bot_name}, egy intelligens kód-asszisztens bot. \
-            Feladatod, hogy segíts a felhasználóknak programozási kérdésekben, \
-            kódhibák javításában és szoftvertervezésben. \
-            Legyél tömör, pontos, és mindig adj működő kód példákat. \
-            Magyar és angol nyelven egyaránt kommunikálsz."
+            "Te vagy {bot_name}, egy programozó asszisztens. \
+            Válaszolj röviden, konkrétan, és a kérdés nyelvén. \
+            Kód esetén adj tiszta, futtatható példát. \
+            Ne ismételd vissza a promptot és ne adj meta-instrukciókat."
         );
 
         Self {
@@ -125,10 +124,11 @@ impl BotLogic {
             prompt,
             system_prompt: Some(self.system_prompt.clone()),
             max_new_tokens,
-            temperature: 0.7,
-            top_p: 0.95,
+            // Kisebb modelleknél stabilabb, kevésbé "hallucináló" kimenet.
+            temperature: 0.2,
+            top_p: 0.9,
             top_k: 50,
-            repetition_penalty: 1.1,
+            repetition_penalty: 1.05,
             stream: false,
         }
     }
@@ -163,7 +163,20 @@ impl BotLogic {
 
     /// Tisztítja az LLM nyers kimenetét (felesleges prefixek eltávolítása stb.)
     pub fn postprocess_response(&self, raw: &str) -> String {
-        let raw = raw.trim();
+        let mut cleaned = raw.trim().to_string();
+
+        // Több modell visszaírhatja a prompt sablon egy részét; itt levágjuk.
+        if let Some((head, _)) = cleaned.split_once("### Instruction:") {
+            cleaned = head.trim().to_string();
+        }
+        if let Some((head, _)) = cleaned.split_once("\nUser:") {
+            cleaned = head.trim().to_string();
+        }
+        if let Some((head, _)) = cleaned.split_once("User:") {
+            cleaned = head.trim().to_string();
+        }
+
+        let raw = cleaned.trim();
 
         // Eltávolítjuk ha a bot saját nevével kezdi a választ
         let prefixes = [

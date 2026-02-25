@@ -5,7 +5,7 @@
 torch>=2.2.0                   # CUDA 12.x kompatibilis wheel ajánlott
 torchvision>=0.17.0
 torchaudio>=2.2.0
-transformers>=4.40.0
+transformers>=4.40.0,<5.0.0
 accelerate>=0.29.0             # multi-GPU device_map="auto" támogatás
 safetensors>=0.4.3             # gyors modell betöltés
 

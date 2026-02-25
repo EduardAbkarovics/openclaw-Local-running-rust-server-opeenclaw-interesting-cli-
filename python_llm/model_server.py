@@ -11,6 +11,7 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional, AsyncGenerator
+from threading import Thread, Lock
 
 _project_root = Path(__file__).resolve().parent.parent
 
@@ -46,7 +47,6 @@ from transformers import (
     BitsAndBytesConfig,
     TextIteratorStreamer,
 )
-from threading import Thread
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -64,6 +64,7 @@ MODEL_NAME = os.environ.get("MODEL_NAME", "WizardLM/WizardCoder-Python-13B-V1.0"
 MAX_NEW_TOKENS = int(os.environ.get("MAX_NEW_TOKENS", "512"))
 HOST = os.environ.get("LLM_HOST", "0.0.0.0")
 PORT = int(os.environ.get("LLM_PORT", "8000"))
+LOAD_IN_4BIT = os.environ.get("LOAD_IN_4BIT", "1").strip().lower() in {"1", "true", "yes"}
 
 # ---------------------------------------------------------------------------
 # GPU detektálás
@@ -133,62 +134,112 @@ def build_max_memory(gpu_info: dict) -> Optional[dict]:
 # ---------------------------------------------------------------------------
 _model: Optional[AutoModelForCausalLM] = None
 _tokenizer: Optional[AutoTokenizer] = None
+_model_loading = False
+_model_load_error: Optional[str] = None
+_model_state_lock = Lock()
 
 
 def load_model():
-    global _model, _tokenizer
+    global _model, _tokenizer, _model_loading, _model_load_error
 
-    gpu_info = detect_gpus()
+    with _model_state_lock:
+        if _model_loading or (_model is not None and _tokenizer is not None):
+            return
+        _model_loading = True
+        _model_load_error = None
 
-    _tokenizer = AutoTokenizer.from_pretrained(
-        MODEL_NAME,
-        use_fast=True,
-        trust_remote_code=True,
-    )
+    try:
+        gpu_info = detect_gpus()
 
-    if gpu_info["device_count"] > 0:
-        log.info(f"Modell betöltése: {MODEL_NAME}")
-        log.info("Mód: float16 | device_map: auto (multi-GPU + CPU offload)")
-
-        # GPU-nként max memória: hagyunk helyet a KV cache-nek és aktivációknak
-        max_mem = {}
-        for g in gpu_info["gpus"]:
-            # 3 GB-ot hagyunk szabadon inference-hoz
-            safe = max(1, int(g["vram_gb"]) - 3)
-            max_mem[g["index"]] = f"{safe}GiB"
-        max_mem["cpu"] = "16GiB"
-        log.info(f"Max memória korlátok: {max_mem}")
-
-        _model = AutoModelForCausalLM.from_pretrained(
+        _tokenizer = AutoTokenizer.from_pretrained(
             MODEL_NAME,
-            torch_dtype=torch.float16,
-            device_map="auto",
-            max_memory=max_mem,
+            use_fast=True,
             trust_remote_code=True,
-            low_cpu_mem_usage=True,
-        )
-    else:
-        log.warning("Nincs GPU -- CPU float32 modban fut (nagyon lassu!)")
-        _model = AutoModelForCausalLM.from_pretrained(
-            MODEL_NAME,
-            torch_dtype=torch.float32,
-            device_map="cpu",
-            trust_remote_code=True,
-            low_cpu_mem_usage=True,
         )
 
-    _model.eval()
+        if gpu_info["device_count"] > 0:
+            log.info(f"Modell betöltése: {MODEL_NAME}")
+            log.info("Mód: GPU | device_map: auto (multi-GPU + CPU offload)")
 
-    # torch.compile Windows-on nem megbízható, kihagyva
-    log.info("torch.compile() kihagyva (Windows kompatibilitás).")
+            # GPU-nként max memória: hagyunk helyet a KV cache-nek és aktivációknak
+            max_mem = {}
+            for g in gpu_info["gpus"]:
+                # 3 GB-ot hagyunk szabadon inference-hoz
+                safe = max(1, int(g["vram_gb"]) - 3)
+                max_mem[g["index"]] = f"{safe}GiB"
+            max_mem["cpu"] = "16GiB"
+            log.info(f"Max memória korlátok: {max_mem}")
 
-    log.info("Modell sikeresen betöltve.")
+            if LOAD_IN_4BIT:
+                log.info("4-bit kvantizált betöltés engedélyezve (LOAD_IN_4BIT=1).")
+                try:
+                    quant_cfg = BitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_quant_type="nf4",
+                        bnb_4bit_use_double_quant=True,
+                        bnb_4bit_compute_dtype=torch.float16,
+                    )
+                    _model = AutoModelForCausalLM.from_pretrained(
+                        MODEL_NAME,
+                        device_map="auto",
+                        max_memory=max_mem,
+                        quantization_config=quant_cfg,
+                        trust_remote_code=True,
+                        low_cpu_mem_usage=True,
+                    )
+                except Exception as q_err:
+                    log.warning(f"4-bit betöltés nem sikerült ({q_err}), fallback float16 módra.")
+                    _model = AutoModelForCausalLM.from_pretrained(
+                        MODEL_NAME,
+                        torch_dtype=torch.float16,
+                        device_map="auto",
+                        max_memory=max_mem,
+                        trust_remote_code=True,
+                        low_cpu_mem_usage=True,
+                    )
+            else:
+                _model = AutoModelForCausalLM.from_pretrained(
+                    MODEL_NAME,
+                    torch_dtype=torch.float16,
+                    device_map="auto",
+                    max_memory=max_mem,
+                    trust_remote_code=True,
+                    low_cpu_mem_usage=True,
+                )
+        else:
+            log.warning("Nincs GPU -- CPU float32 modban fut (nagyon lassu!)")
+            _model = AutoModelForCausalLM.from_pretrained(
+                MODEL_NAME,
+                torch_dtype=torch.float32,
+                device_map="cpu",
+                trust_remote_code=True,
+                low_cpu_mem_usage=True,
+            )
 
-    if torch.cuda.is_available():
-        for i in range(torch.cuda.device_count()):
-            alloc = torch.cuda.memory_allocated(i) / (1024**3)
-            total = torch.cuda.get_device_properties(i).total_memory / (1024**3)
-            log.info(f"  GPU {i} mem: {alloc:.2f} / {total:.2f} GB használatban")
+        _model.eval()
+
+        # torch.compile Windows-on nem megbízható, kihagyva
+        log.info("torch.compile() kihagyva (Windows kompatibilitás).")
+
+        log.info("Modell sikeresen betöltve.")
+
+        if torch.cuda.is_available():
+            for i in range(torch.cuda.device_count()):
+                alloc = torch.cuda.memory_allocated(i) / (1024**3)
+                total = torch.cuda.get_device_properties(i).total_memory / (1024**3)
+                log.info(f"  GPU {i} mem: {alloc:.2f} / {total:.2f} GB használatban")
+    except Exception as e:
+        _model = None
+        _tokenizer = None
+        _model_load_error = str(e)
+        log.error(f"Modell betöltési hiba: {e}", exc_info=True)
+    finally:
+        with _model_state_lock:
+            _model_loading = False
+
+
+def start_model_loader() -> None:
+    Thread(target=load_model, daemon=True, name="model-loader").start()
 
 # ---------------------------------------------------------------------------
 # FastAPI lifespan (betöltés induláskor)
@@ -196,8 +247,8 @@ def load_model():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, load_model)
+    # A szerver azonnal elindul; a modell betöltése háttérszálon történik.
+    start_model_loader()
     yield
     log.info("Szerver leáll.")
 
@@ -238,14 +289,26 @@ class GenerateResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _build_full_prompt(req: GenerateRequest) -> str:
-    """WizardCoder stílusú prompt formátum."""
+    """Chat-típusú modellekhez natív chat template prompt."""
+    if _tokenizer is None:
+        return req.prompt
+
+    messages = []
     if req.system_prompt:
-        return (
-            f"### System:\n{req.system_prompt}\n\n"
-            f"### Instruction:\n{req.prompt}\n\n"
-            f"### Response:\n"
+        messages.append({"role": "system", "content": req.system_prompt})
+    messages.append({"role": "user", "content": req.prompt})
+
+    try:
+        return _tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
         )
-    return f"### Instruction:\n{req.prompt}\n\n### Response:\n"
+    except Exception:
+        # Fallback, ha adott tokenizer nem támogatja a chat template-et.
+        if req.system_prompt:
+            return f"{req.system_prompt}\n\nUser: {req.prompt}\nAssistant:"
+        return f"User: {req.prompt}\nAssistant:"
 
 
 def _get_input_device() -> str:
@@ -276,10 +339,16 @@ async def health():
                 "used_gb": round(alloc, 2),
                 "total_gb": round(total, 2),
             })
+    status = "ok" if _model is not None and _tokenizer is not None else "loading"
+    if _model_load_error:
+        status = "error"
+
     return {
-        "status": "ok",
+        "status": status,
         "model": MODEL_NAME,
         "model_loaded": _model is not None,
+        "model_loading": _model_loading,
+        "error": _model_load_error,
         "gpus": gpu_info,
     }
 
@@ -287,7 +356,12 @@ async def health():
 @app.post("/generate", response_model=GenerateResponse)
 async def generate(req: GenerateRequest):
     if _model is None or _tokenizer is None:
-        raise HTTPException(503, "A modell még nem töltődött be.")
+        if _model_load_error:
+            raise HTTPException(503, f"A modell betöltése hibára futott: {_model_load_error}")
+        if _model_loading:
+            raise HTTPException(503, "A modell betöltése folyamatban van. Próbáld újra rövidesen.")
+        start_model_loader()
+        raise HTTPException(503, "A modell inicializálása elindult. Próbáld újra rövidesen.")
 
     if req.stream:
         return await _stream_response(req)
