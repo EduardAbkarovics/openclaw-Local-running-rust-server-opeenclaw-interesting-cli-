@@ -275,7 +275,7 @@ async def chat_loop():
         return
 
     try:
-        async with websockets.connect(RUST_WS_URL) as ws:
+        async with websockets.connect(RUST_WS_URL, ping_interval=None) as ws:
             welcome = json.loads(await ws.recv())
             sid     = welcome.get("session_id", "?")
             bot_srv = welcome.get("bot", BOT_NAME)
@@ -329,7 +329,7 @@ async def chat_loop():
                 elif resp.get("type") == "error":
                     error_bubble(resp.get("message", "Ismeretlen hiba"))
 
-    except websockets.exceptions.ConnectionRefusedError:
+    except (OSError, websockets.exceptions.ConnectionClosedError):
         error_bubble(f"Kapcsolat elutasítva: {RUST_WS_URL}")
     except Exception as e:
         error_bubble(str(e))

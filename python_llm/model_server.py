@@ -147,31 +147,25 @@ def load_model():
     )
 
     if gpu_info["device_count"] > 0:
-        bnb_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.float16,
-            bnb_4bit_use_double_quant=True,
-        )
         log.info(f"Modell betöltése: {MODEL_NAME}")
-        log.info("Mód: 4-bit NF4 kvantálás | device_map: auto")
+        log.info("Mód: float16 | device_map: auto (multi-GPU + CPU offload)")
 
-        # Flash Attention 2 – ha telepítve van, ~2x gyorsabb attention
-        _attn_impl = "eager"
-        try:
-            import flash_attn  # noqa: F401
-            _attn_impl = "flash_attention_2"
-            log.info("Flash Attention 2 aktív!")
-        except ImportError:
-            log.info("Flash Attention 2 nincs telepítve, eager attention fut.")
+        # GPU-nként max memória: hagyunk helyet a KV cache-nek és aktivációknak
+        max_mem = {}
+        for g in gpu_info["gpus"]:
+            # 3 GB-ot hagyunk szabadon inference-hoz
+            safe = max(1, int(g["vram_gb"]) - 3)
+            max_mem[g["index"]] = f"{safe}GiB"
+        max_mem["cpu"] = "16GiB"
+        log.info(f"Max memória korlátok: {max_mem}")
 
         _model = AutoModelForCausalLM.from_pretrained(
             MODEL_NAME,
-            quantization_config=bnb_config,
+            torch_dtype=torch.float16,
             device_map="auto",
+            max_memory=max_mem,
             trust_remote_code=True,
             low_cpu_mem_usage=True,
-            attn_implementation=_attn_impl,
         )
     else:
         log.warning("Nincs GPU -- CPU float32 modban fut (nagyon lassu!)")
@@ -185,12 +179,8 @@ def load_model():
 
     _model.eval()
 
-    # torch.compile – ~20-30% gyorsabb inference (első kérés lassabb: warmup)
-    try:
-        _model = torch.compile(_model, mode="reduce-overhead")
-        log.info("torch.compile() aktív (reduce-overhead mód).")
-    except Exception as e:
-        log.info(f"torch.compile() kihagyva: {e}")
+    # torch.compile Windows-on nem megbízható, kihagyva
+    log.info("torch.compile() kihagyva (Windows kompatibilitás).")
 
     log.info("Modell sikeresen betöltve.")
 
@@ -303,7 +293,15 @@ async def generate(req: GenerateRequest):
         return await _stream_response(req)
 
     loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(None, _generate_sync, req)
+    try:
+        result = await loop.run_in_executor(None, _generate_sync, req)
+    except torch.cuda.OutOfMemoryError as e:
+        log.error(f"CUDA OOM: {e}")
+        torch.cuda.empty_cache()
+        raise HTTPException(503, f"CUDA memória tele: {e}")
+    except Exception as e:
+        log.error(f"Generálási hiba: {e}", exc_info=True)
+        raise HTTPException(500, f"Generálási hiba: {e}")
     return result
 
 

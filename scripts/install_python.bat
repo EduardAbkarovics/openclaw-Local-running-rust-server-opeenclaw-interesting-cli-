@@ -66,6 +66,12 @@ if %ERRORLEVEL% NEQ 0 (
 :: ── Aktiválás ────────────────────────────────────────────────────────────────
 call .venv\Scripts\activate.bat
 
+:: ── Cache W: meghajtóra ──────────────────────────────────────────────────────
+set PIP_CACHE_DIR=W:\pip_cache
+set TMPDIR=W:\tmp
+set TEMP=W:\tmp
+set TMP=W:\tmp
+
 :: ── PyTorch CUDA telepítése ──────────────────────────────────────────────────
 echo [2/3] PyTorch CUDA 12.1 telepítése...
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121

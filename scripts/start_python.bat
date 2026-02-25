@@ -12,6 +12,10 @@ set HF_HUB_CACHE=W:\openclaw_server_hosting\models
 set HF_DATASETS_CACHE=W:\openclaw_server_hosting\models
 set HUGGINGFACE_HUB_CACHE=W:\openclaw_server_hosting\models
 set TRANSFORMERS_CACHE=W:\openclaw_server_hosting\models
+set PIP_CACHE_DIR=W:\pip_cache
+set TMPDIR=W:\tmp
+set TEMP=W:\tmp
+set TMP=W:\tmp
 echo HF cache: %HF_HOME%
 
 :: Venv ellenőrzése

@@ -23,8 +23,11 @@ if exist "..\\.env" (
 )
 set RUST_LOG=clawdbot_server=info,tower_http=info
 
-:: Ha W: mapped/subst drive -> target mappát C:-re irányítjuk (cargo-lock hiba elkerülése)
-set CARGO_TARGET_DIR=%USERPROFILE%\.cargo\targets\openclaw_server
+:: Build cache és Cargo registry W: meghajtóra
+set CARGO_TARGET_DIR=W:\openclaw_server_hosting\rust_server\target
+set CARGO_HOME=W:\.cargo
+set TEMP=W:\tmp
+set TMP=W:\tmp
 
 :: Fordítás (csak ha szükséges)
 echo Rust szerver fordítása...
