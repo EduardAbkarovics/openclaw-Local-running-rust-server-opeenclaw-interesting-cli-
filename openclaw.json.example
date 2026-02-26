@@ -1,0 +1,102 @@
+{
+  "meta": {
+    "lastTouchedVersion": "2026.2.25",
+    "lastTouchedAt": "2026-02-27T00:00:00.000Z"
+  },
+  "wizard": {
+    "lastRunAt": "2026-02-26T22:57:21.165Z",
+    "lastRunVersion": "2026.2.25",
+    "lastRunCommand": "configure",
+    "lastRunMode": "local"
+  },
+  "auth": {
+    "profiles": {
+      "anthropic:default": {
+        "provider": "anthropic",
+        "mode": "token"
+      }
+    }
+  },
+  "models": {
+    "providers": {
+      "ollama": {
+        "baseUrl": "http://127.0.0.1:11434/v1",
+        "apiKey": "ollama-local",
+        "api": "ollama",
+        "models": [
+          {
+            "id": "glm-4.7-flash",
+            "name": "glm-4.7-flash",
+            "input": ["text"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+          }
+        ]
+      },
+      "deepseek": {
+        "baseUrl": "http://127.0.0.1:3000/v1",
+        "apiKey": "openclaw-local",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "openclaw-local",
+            "name": "deepseek r1",
+            "input": ["text"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "deepseek r1",
+        "fallbacks": []
+      },
+      "models": {
+        "deepseek r1": {}
+      },
+      "workspace": "C:\\Users\\eduard\\.openclaw\\workspace"
+    }
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "restart": true,
+    "ownerDisplay": "raw"
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "dmPolicy": "pairing",
+      "botToken": "YOUR_TELEGRAM_BOT_TOKEN",
+      "groupPolicy": "allowlist",
+      "streaming": "off"
+    },
+    "discord": {
+      "enabled": true,
+      "token": "YOUR_DISCORD_BOT_TOKEN",
+      "groupPolicy": "allowlist",
+      "streaming": "off",
+      "guilds": {}
+    }
+  },
+  "gateway": {
+    "mode": "local",
+    "auth": {
+      "mode": "token",
+      "token": "YOUR_GATEWAY_AUTH_TOKEN"
+    }
+  },
+  "skills": {
+    "install": {
+      "nodeManager": "npm"
+    }
+  },
+  "plugins": {
+    "entries": {
+      "discord": { "enabled": true },
+      "telegram": { "enabled": true }
+    }
+  }
+}

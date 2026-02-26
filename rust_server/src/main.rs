@@ -1,6 +1,7 @@
 mod config;
 mod error;
 mod llm_client;
+mod openai_compat;
 mod routes;
 mod bot_logic;
 mod middleware;

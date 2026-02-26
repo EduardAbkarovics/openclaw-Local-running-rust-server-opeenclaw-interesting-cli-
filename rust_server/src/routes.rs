@@ -1,4 +1,4 @@
-﻿/// Axum route definíciók és handler-ek.
+/// Axum route definíciók és handler-ek.
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -24,6 +24,7 @@ use crate::config::AppConfig;
 use crate::error::AppError;
 use crate::llm_client::LlmClient;
 use crate::middleware::{build_rate_limiter, cors_layer, timeout_layer, trace_layer};
+use crate::openai_compat;
 
 // ---------------------------------------------------------------------------
 // App State
@@ -83,6 +84,9 @@ pub async fn build_router(cfg: Arc<AppConfig>) -> anyhow::Result<Router> {
         .route("/ws/chat", get(handle_ws_upgrade))
         // --- Session kezelés ---
         .route("/session/new", post(handle_new_session))
+        // --- OpenAI-compat (OpenClaw gateway lokális LLM-hez) ---
+        .route("/v1/models", get(openai_compat::handle_models))
+        .route("/v1/chat/completions", axum::routing::post(openai_compat::handle_chat_completions))
         .route_layer(middleware::from_fn_with_state(state.clone(), rate_limit_middleware))
         .with_state(state)
         .layer(cors_layer(&cfg.cors_origins))
